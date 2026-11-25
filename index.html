@@ -1,0 +1,87 @@
+<!doctype html>
+<!-- IG 授權小頁（GitHub Pages 版）：沒帶 code → 顯示授權連結；IG 導回帶 code → 顯示授權碼給人複製
+     不在這裡換 Token，App Secret 不放網頁；拿到授權碼後在本機換 -->
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>IG 授權</title>
+<style>
+  body { font-family: sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+  textarea { width: 100%; height: 120px; font-family: monospace; }
+  .btn { display: inline-block; padding: 10px 18px; background: #c13584; color: #fff; text-decoration: none; border: 0; border-radius: 6px; cursor: pointer; }
+  .err { color: #c00; }
+  [hidden] { display: none; }
+</style>
+</head>
+<body>
+
+<section id="start" hidden>
+  <h2>IG 帳號授權</h2>
+  <p>先在瀏覽器登入要授權的 IG 帳號，再按下面按鈕。</p>
+  <p><a class="btn" id="authBtn">前往授權</a></p>
+  <p>授權連結（可複製傳給別人）：</p>
+  <textarea id="authUrl" readonly></textarea>
+</section>
+
+<section id="ok" hidden>
+  <h2>授權成功</h2>
+  <p>複製下面的授權碼，1 小時內拿去換 Token（只能用一次）：</p>
+  <textarea id="code" readonly></textarea>
+  <p><button class="btn" id="copyBtn">複製</button></p>
+</section>
+
+<section id="fail" hidden>
+  <h2 class="err">授權失敗</h2>
+  <p id="errMsg"></p>
+  <p><a class="btn" id="retryBtn">重新授權</a></p>
+</section>
+
+<script>
+// ===== 設定 =====
+const IG_APP_ID = '填 Instagram App ID';  // 後台 Instagram → API 設定 那頁的 ID，不是 Meta App ID
+const REDIRECT_URI = location.origin + location.pathname; // 要跟後台填的回呼網址一字不差
+const SCOPES = [
+  'instagram_business_basic',
+  'instagram_business_manage_insights',
+  'instagram_business_content_publish',
+  'instagram_business_manage_comments',
+];
+// ================
+
+const authUrl = 'https://www.instagram.com/oauth/authorize?' + new URLSearchParams({
+  client_id: IG_APP_ID,
+  redirect_uri: REDIRECT_URI,
+  response_type: 'code',
+  scope: SCOPES.join(','),
+  force_authentication: '1', // 每次都要求登入，避免拿到上一個帳號
+  enable_fb_login: '0',
+});
+
+const q = new URLSearchParams(location.search);
+const code = (q.get('code') || '').replace(/#_$/, ''); // IG 會在尾巴加 #_
+const error = q.get('error_description') || q.get('error');
+
+const show = id => document.getElementById(id).hidden = false;
+
+if (error) {
+  document.getElementById('errMsg').textContent = error;
+  document.getElementById('retryBtn').href = authUrl;
+  show('fail');
+} else if (code) {
+  document.getElementById('code').value = code;
+  history.replaceState(null, '', location.pathname); // 網址列清掉授權碼，避免留在瀏覽紀錄
+  document.getElementById('copyBtn').onclick = e => {
+    navigator.clipboard.writeText(code);
+    e.target.textContent = '已複製';
+  };
+  show('ok');
+} else {
+  document.getElementById('authBtn').href = authUrl;
+  document.getElementById('authUrl').value = authUrl;
+  show('start');
+}
+</script>
+</body>
+</html>
