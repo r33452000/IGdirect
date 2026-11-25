@@ -1,87 +1,111 @@
-<!doctype html>
-<!-- IG 授權小頁（GitHub Pages 版）：沒帶 code → 顯示授權連結；IG 導回帶 code → 顯示授權碼給人複製
-     不在這裡換 Token，App Secret 不放網頁；拿到授權碼後在本機換 -->
+<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>IG 授權</title>
+<title>IG 授權完成</title>
 <style>
-  body { font-family: sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
-  textarea { width: 100%; height: 120px; font-family: monospace; }
-  .btn { display: inline-block; padding: 10px 18px; background: #c13584; color: #fff; text-decoration: none; border: 0; border-radius: 6px; cursor: pointer; }
-  .err { color: #c00; }
-  [hidden] { display: none; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; min-height: 100vh;
+    font-family: -apple-system, "PingFang TC", "Noto Sans TC", system-ui, sans-serif;
+    background: #f5f3ff; color: #1f2937;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .card {
+    background: #fff; border-radius: 20px; padding: 28px 22px;
+    max-width: 440px; width: 100%; box-shadow: 0 10px 40px rgba(99,62,180,.12);
+  }
+  .icon { font-size: 44px; text-align: center; margin-bottom: 8px; }
+  h1 { font-size: 20px; text-align: center; margin: 0 0 6px; }
+  p.sub { text-align: center; color: #6b7280; margin: 0 0 20px; font-size: 15px; line-height: 1.6; }
+  .label { font-size: 13px; color: #6b7280; margin-bottom: 6px; }
+  .code {
+    background: #f3f0ff; border: 1px solid #ddd6fe; border-radius: 12px;
+    padding: 14px; font-family: ui-monospace, Menlo, monospace; font-size: 14px;
+    word-break: break-all; line-height: 1.5; color: #4c1d95; max-height: 160px; overflow-y: auto;
+  }
+  button {
+    width: 100%; margin-top: 14px; padding: 15px; border: none; border-radius: 12px;
+    background: #7c3aed; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
+  }
+  button:active { background: #6d28d9; }
+  .steps { margin-top: 20px; padding-top: 18px; border-top: 1px solid #f0edfa; font-size: 14px; color: #4b5563; line-height: 1.7; }
+  .steps b { color: #1f2937; }
+  .err { color: #b91c1c; }
+  .hide { display: none; }
 </style>
 </head>
 <body>
+<div class="card">
+  <div id="ok" class="hide">
+    <div class="icon">✅</div>
+    <h1>授權成功！</h1>
+    <p class="sub">請複製下面這組代碼，用 LINE 傳回給 Emily。</p>
+    <div class="label">你的授權代碼</div>
+    <div class="code" id="codeBox"></div>
+    <button id="copyBtn">複製代碼</button>
+    <div class="steps">
+      <b>接下來：</b><br>
+      1. 按上面「複製代碼」<br>
+      2. 回到 LINE，貼給 Emily<br>
+      3. 完成，這個頁面可以關掉了
+    </div>
+  </div>
 
-<section id="start" hidden>
-  <h2>IG 帳號授權</h2>
-  <p>先在瀏覽器登入要授權的 IG 帳號，再按下面按鈕。</p>
-  <p><a class="btn" id="authBtn">前往授權</a></p>
-  <p>授權連結（可複製傳給別人）：</p>
-  <textarea id="authUrl" readonly></textarea>
-</section>
+  <div id="deny" class="hide">
+    <div class="icon">⚠️</div>
+    <h1>尚未完成授權</h1>
+    <p class="sub err" id="errMsg">授權被取消或未完成。</p>
+    <p class="sub">請回到 Emily 給你的連結，重新點一次並按「同意」。</p>
+  </div>
 
-<section id="ok" hidden>
-  <h2>授權成功</h2>
-  <p>複製下面的授權碼，1 小時內拿去換 Token（只能用一次）：</p>
-  <textarea id="code" readonly></textarea>
-  <p><button class="btn" id="copyBtn">複製</button></p>
-</section>
-
-<section id="fail" hidden>
-  <h2 class="err">授權失敗</h2>
-  <p id="errMsg"></p>
-  <p><a class="btn" id="retryBtn">重新授權</a></p>
-</section>
+  <div id="empty" class="hide">
+    <div class="icon">🔗</div>
+    <h1>請從授權連結進入</h1>
+    <p class="sub">這個頁面需要從 Emily 提供的 Instagram 授權連結開啟。</p>
+  </div>
+</div>
 
 <script>
-// ===== 設定 =====
-const IG_APP_ID = '填 Instagram App ID';  // 後台 Instagram → API 設定 那頁的 ID，不是 Meta App ID
-const REDIRECT_URI = location.origin + location.pathname; // 要跟後台填的回呼網址一字不差
-const SCOPES = [
-  'instagram_business_basic',
-  'instagram_business_manage_insights',
-  'instagram_business_content_publish',
-  'instagram_business_manage_comments',
-];
-// ================
+(function () {
+  function getParam(name) {
+    var s = window.location.search || "";
+    var h = window.location.hash ? window.location.hash.replace(/^#/, "?") : "";
+    var m = new URLSearchParams(s).get(name);
+    if (m) return m;
+    try { return new URLSearchParams(h).get(name); } catch (e) { return null; }
+  }
+  var code = getParam("code");
+  var error = getParam("error") || getParam("error_reason") || getParam("error_description");
 
-const authUrl = 'https://www.instagram.com/oauth/authorize?' + new URLSearchParams({
-  client_id: IG_APP_ID,
-  redirect_uri: REDIRECT_URI,
-  response_type: 'code',
-  scope: SCOPES.join(','),
-  force_authentication: '1', // 每次都要求登入，避免拿到上一個帳號
-  enable_fb_login: '0',
-});
+  var ok = document.getElementById("ok");
+  var deny = document.getElementById("deny");
+  var empty = document.getElementById("empty");
 
-const q = new URLSearchParams(location.search);
-const code = (q.get('code') || '').replace(/#_$/, ''); // IG 會在尾巴加 #_
-const error = q.get('error_description') || q.get('error');
-
-const show = id => document.getElementById(id).hidden = false;
-
-if (error) {
-  document.getElementById('errMsg').textContent = error;
-  document.getElementById('retryBtn').href = authUrl;
-  show('fail');
-} else if (code) {
-  document.getElementById('code').value = code;
-  history.replaceState(null, '', location.pathname); // 網址列清掉授權碼，避免留在瀏覽紀錄
-  document.getElementById('copyBtn').onclick = e => {
-    navigator.clipboard.writeText(code);
-    e.target.textContent = '已複製';
-  };
-  show('ok');
-} else {
-  document.getElementById('authBtn').href = authUrl;
-  document.getElementById('authUrl').value = authUrl;
-  show('start');
-}
+  if (code) {
+    code = code.replace(/#_$/, "");
+    document.getElementById("codeBox").textContent = code;
+    ok.classList.remove("hide");
+    var btn = document.getElementById("copyBtn");
+    btn.addEventListener("click", function () {
+      navigator.clipboard.writeText(code).then(function () {
+        btn.textContent = "已複製 ✓";
+        setTimeout(function () { btn.textContent = "複製代碼"; }, 1800);
+      }).catch(function () {
+        var r = document.createRange();
+        r.selectNodeContents(document.getElementById("codeBox"));
+        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        btn.textContent = "已選取，請長按複製";
+      });
+    });
+  } else if (error) {
+    document.getElementById("errMsg").textContent = decodeURIComponent(error);
+    deny.classList.remove("hide");
+  } else {
+    empty.classList.remove("hide");
+  }
+})();
 </script>
 </body>
 </html>
